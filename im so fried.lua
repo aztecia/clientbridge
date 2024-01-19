@@ -3564,6 +3564,87 @@ AddCommand("pathfind", {"follow2"}, "finds a user with pathfinding", {"1",3}, fu
     end
 end)
 
+
+task.spawn(function()
+    local chatted = function(plr, raw)
+        local message = raw
+
+        if (_L.ChatLogsEnabled) then
+
+            local time = os.date("%X");
+            local Text = format("%s - [%s]: %s", time, plr.Name, raw);
+            local Clone = Clone(ChatLogMessage);
+
+            Clone.Text = Text
+            Clone.Visible = true
+            Clone.TextTransparency = 1
+            Clone.Parent = ChatLogs.Frame.List
+
+            Utils.Tween(Clone, "Sine", "Out", .25, {
+                TextTransparency = 0
+            })
+
+            ChatLogs.Frame.List.CanvasSize = UDim2.fromOffset(0, ChatLogs.Frame.List.UIListLayout.AbsoluteContentSize.Y);
+        end
+
+        if (startsWith(raw, "/e")) then
+            raw = sub(raw, 4);
+        elseif (startsWith(raw, "/w")) then
+            raw = shift(shift(split(message, " ")));
+        elseif (startsWith(raw, Prefix)) then
+            raw = sub(raw, #Prefix + 1);
+        else
+            return
+        end
+
+        message = trim(raw);
+
+        if (Tfind(AdminUsers, plr) or plr == LocalPlayer) then
+            local CommandArgs = split(message, " ");
+            local Command = CommandArgs[1]
+            local Args = shift(CommandArgs);
+
+            ExecuteCommand(Command, Args, plr);
+        end
+    end
+
+    CConnect(LocalPlayer.Chatted, function(raw)
+        chatted(LocalPlayer, raw);
+    end);
+
+    if (Services.TextChatService.ChatVersion == Enum.ChatVersion.TextChatService) then
+        Services.TextChatService.OnIncomingMessage = function(message)
+            chatted(Services.Players:FindFirstChild(message.TextSource.Name), message.Text);
+        end
+        return;
+    end
+
+    local DefaultChatSystemChatEvents = Services.ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents");
+    if (not DefaultChatSystemChatEvents) then return; end
+    local OnMessageDoneFiltering = DefaultChatSystemChatEvents:WaitForChild("OnMessageDoneFiltering", 5);
+    if (not OnMessageDoneFiltering) then return; end
+    if (typeof(OnMessageDoneFiltering) ~= "Instance" or OnMessageDoneFiltering.ClassName ~= "RemoteEvent") then return; end
+
+
+    CConnect(OnMessageDoneFiltering.OnClientEvent, function(messageData)
+        if (type(messageData) ~= "table") then return; end
+        local plr = Services.Players:FindFirstChild(messageData.FromSpeaker);
+        local raw = messageData.Message
+        if (not plr or not raw or plr == LocalPlayer) then return; end
+
+        if (messageData.OriginalChannel == "Team") then
+            raw = "/team " .. raw
+        else
+            local whisper = string.match(messageData.OriginalChannel, "To (.+)");
+            if (whisper) then
+                raw = string.format("/w %s %s", whisper, raw);
+            end
+        end
+
+        chatted(plr, raw);
+    end);
+
+end);
 --IMPORT [uimore]
 Notification.Visible = false
 Utils.SetAllTrans(CommandBar);
