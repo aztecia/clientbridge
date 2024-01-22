@@ -3050,9 +3050,7 @@ AddCommand("coinfarm", {"cf"}, "farms for coins in murder mystery", {3}, functio
 	                            local vChildren = v:GetChildren()
 	                            for i,child in pairs(vChildren) do
 	                                if child.Name == "CoinContainer" then
-	                                    if child.Coin_Server:WaitForChild("Coin") ~= nil then
 	                                        tp(child.Coin_Server.Coin.CFrame, 3)
-	                                    end
 	                                else
 	                                    -- game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer("Waiting for coins | Coins not found.", "normalchat")
 	                                    if rnumber == 1 then
