@@ -3018,7 +3018,6 @@ AddCommand("coinfarm", {"cf"}, "farms for coins in murder mystery", {3}, functio
 	            local rnumber = math.random(1,6)
 	            if game.Players.LocalPlayer.Backpack:FindFirstChild("Knife") then
 	                -- game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer("Knife Detected in inventory, Killing all players.", "normalchat")
-	                repeat wait()
 	                    game.Players.LocalPlayer.Backpack:FindFirstChild("Knife").Parent = game.Players.LocalPlayer.Character
 	                    repeat wait() until game.Players.LocalPlayer.Character:FindFirstChild("Knife")
 	                    game:GetService("Players").LocalPlayer.Character.Knife.Stab:FireServer("Slash")
@@ -3031,7 +3030,6 @@ AddCommand("coinfarm", {"cf"}, "farms for coins in murder mystery", {3}, functio
 	                            getRoot(Players[v].Character).CFrame = getRoot(speaker.Character).CFrame + Vector3.new(3,1,0)
 	                        end
 	                    end
-	                until not game.Players.LocalPlayer.Backpack:FindFirstChild("Knife")
 	            elseif game.Players.LocalPlayer.Backpack:FindFirstChild("Gun") then
 	                if #game:GetService("Players"):GetPlayers() > 0 then
 	                    local randomPlayer = game:GetService("Players"):GetPlayers()[math.random(1, #game:GetService("Players"):GetPlayers())]
