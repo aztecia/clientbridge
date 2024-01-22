@@ -1,5 +1,5 @@
 repeat wait() until game:IsLoaded()
-game:GetService("RunService"):Set3dRenderingEnabled(false)
+-- game:GetService("RunService"):Set3dRenderingEnabled(false)
 
 
 local game = game
