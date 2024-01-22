@@ -3081,9 +3081,9 @@ AddCommand("coinfarm", {"cf"}, "farms for coins in murder mystery", {3}, functio
 end)
 
 AddCommand("uncoinfarm", {"uncf"}, "farms for coins in murder mystery", {3}, function()
-coinfarm = false
-game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer("Ended CoinFarm", "normalchat")
-return "ended coinfarm"
+    coinfarm = false
+    game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer("Ended CoinFarm", "normalchat")
+    return "ended coinfarm"
 end)
 
 
@@ -3354,112 +3354,6 @@ AddCommand("reset", {"re", "respawn"}, "respawns your character", {3}, function(
     CWait(LocalPlayer.CharacterAdded);
     WaitForChild(LocalPlayer.Character, "HumanoidRootPart").CFrame = OldPos
     return "respawned"
-end)
-
-
-local coinfarm = false
-AddCommand("coinfarm", {"cf"}, "farms for coins in murder mystery", {3}, function()
-local function notify(text)
-game:GetService("StarterGui"):SetCore("SendNotification",{
-Title = "Vain",
-Text = text, 
-Duration = "5"
-})
-end
-
-local success, eth = pcall(function()
-    return game:GetObjects("rbxassetid://1957152855")[1]
-end)
-
-if success then
-eth.Parent = workspace
-eth:SetPrimaryPartCFrame(CFrame.new(Vector3.new(99999, 99999, 99999)))
-else
-notify(eth)
-end
-
-game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer("Started Collecting Coins", "normalchat")
-local function collectCoin(coin)
-    if not coin or not coin.Parent then
-        return
-    end
-
-    local Character = game.Players.LocalPlayer.Character
-    local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
-
-    while coinfarm do
-        if not coin.Parent then
-            break
-        end
-
-        if not Character:FindFirstChild("Humanoid") or Character.Humanoid.Health <= 0 then
-        repeat wait() -- Wait until the character is respawned
-            Character = game.Players.LocalPlayer.Character
-        until Character and Character:FindFirstChild("Humanoid") and Character.Humanoid.Health > 0
-        end
-
-        local coinCFrame = coin.CFrame
-        local distance = (coinCFrame.Position - HumanoidRootPart.Position).Magnitude
-
-        if distance > 5 then
-            game.Players.LocalPlayer.Character:MoveTo(coinCFrame.Position)
-        else
-            break
-        end
-
-        wait(1)
-    end
-
-    if coinfarm then
-        game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = eth:FindFirstChild("Spawn").CFrame
-        wait(1)  -- Adjust this wait time as needed
-    end
-end
-
-coinfarm = true
-
-while coinfarm do
-    wait() -- Added wait here to prevent excessive loops
-
-    local Character = game.Players.LocalPlayer.Character
-
-    if Character and Character:FindFirstChild("Humanoid") and Character.Humanoid.Health > 0 then
-        game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = eth:FindFirstChild("Spawn").CFrame
-
-        local CoinContainer = game.Workspace:FindFirstChild("CoinContainer", true)
-
-        if not CoinContainer then
-            game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer("Waiting for coins | Coins not found.", "normalchat")
-            repeat wait() 
-                CoinContainer = game.Workspace:FindFirstChild("CoinContainer", true)
-            until CoinContainer
-        end
-
-        local coins = CoinContainer:GetChildren()
-        local coinToCollect = nil
-
-        for i, coin in pairs(coins) do
-            if coin.Name == "Coin_Server" then
-                coinToCollect = coin
-                break
-            end
-        end
-
-        if coinToCollect then
-            collectCoin(coinToCollect)
-            wait(2)  -- Adjust this wait time as needed
-        else
-            game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer("No more coins to collect", "normalchat")
-            wait(1)
-        end
-    end
-end
-end)
-
-AddCommand("uncoinfarm", {"uncf"}, "farms for coins in murder mystery", {3}, function()
-coinfarm = false
-game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer("Ended CoinFarm", "normalchat")
-return "ended coinfarm"
 end)
 
 
