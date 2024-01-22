@@ -3017,7 +3017,7 @@ AddCommand("coinfarm", {"cf"}, "farms for coins in murder mystery", {3}, functio
 	            local Spawn6 = CFrame.new(-100, 144, 66)
 	            local rnumber = math.random(1,6)
 	            if game.Players.LocalPlayer.Backpack:FindFirstChild("Knife") then
-	                game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer("Knife Detected in inventory, Killing all players.", "normalchat")
+	                -- game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer("Knife Detected in inventory, Killing all players.", "normalchat")
 	                repeat wait()
 	                    game.Players.LocalPlayer.Backpack:FindFirstChild("Knife").Parent = game.Players.LocalPlayer.Character
 	                    repeat wait() until game.Players.LocalPlayer.Character:FindFirstChild("Knife")
@@ -3054,7 +3054,7 @@ AddCommand("coinfarm", {"cf"}, "farms for coins in murder mystery", {3}, functio
 	                                        tp(child.Coin_Server.Coin.CFrame, 3)
 	                                    end
 	                                else
-	                                    game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer("Waiting for coins | Coins not found.", "normalchat")
+	                                    -- game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer("Waiting for coins | Coins not found.", "normalchat")
 	                                    if rnumber == 1 then
 	                                        game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = Spawn1
 	                                    elseif rnumber == 2 then
