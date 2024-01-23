@@ -3031,6 +3031,7 @@ AddCommand("coinfarm", {"cf"}, "farms for coins in murder mystery", {3}, functio
                 if game.Players.LocalPlayer.Backpack:FindFirstChild("Knife") then
                     repeat wait()
                         game.Players.LocalPlayer.Backpack:FindFirstChild("Knife").Parent = game.Players.LocalPlayer.Character
+			game.Players.LocalPlayer.Character.Humanoid.Anchored = true
 			wait()
                         for i,v in pairs(game:GetService("Players"):GetPlayers())do
                             if v.Character ~= nil then
@@ -3043,13 +3044,16 @@ AddCommand("coinfarm", {"cf"}, "farms for coins in murder mystery", {3}, functio
                             end
                         end
                     until not game.Players.LocalPlayer.Backpack:FindFirstChild("Knife")
+		    game.Players.LocalPlayer.Character.Humanoid.Anchored = false
                 elseif game.Players.LocalPlayer.Backpack:FindFirstChild("Gun") then
+		    --[[
                     if #game:GetService("Players"):GetPlayers() > 0 then
                         local randomPlayer = game:GetService("Players"):GetPlayers()[math.random(1, #game:GetService("Players"):GetPlayers())]
                         
                         game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = randomPlayer.Character.HumanoidRootPart.CFrame + Vector3.new(3,1,0)
                         print("Selected Player: " .. randomPlayer.Name)
                     end
+		    ]]--
                     wait(0.5)
                     game.Players.LocalPlayer.Character.Humanoid.Health = 0
                     game.Players.LocalPlayer.CharacterAdded:Wait()
