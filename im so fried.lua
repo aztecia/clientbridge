@@ -3000,80 +3000,93 @@ end)
 
 
 local coinfarm = false
+local function tp(cframe, speed)
+    local tween = game:GetService("TweenService")
+    tween:Create(game.Players.LocalPlayer.Character.HumanoidRootPart, TweenInfo.new(speed, Enum.EasingStyle.Linear), { CFrame = cframe }):Play()
+end
+
+local function getRoot(char)
+	local rootPart = char:FindFirstChild('HumanoidRootPart') or char:FindFirstChild('Torso') or char:FindFirstChild('UpperTorso')
+	return rootPart
+end
+
+local CoinContainer = game.Workspace:FindFirstChild("CoinContainer", true) 
+
 AddCommand("coinfarm", {"cf"}, "farms for coins in murder mystery", {3}, function()
 	coinfarm = true
 	if coinfarm then
 	    game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer("Started CoinFarm.", "normalchat")
 	    repeat wait()
-	        pcall(function()
-	            local currentX = game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame.X
-	            local currentY = game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame.Y
-	            local currentZ = game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame.Z
-	            local Spawn1 = CFrame.new(-109, 144, 48)
-	            local Spawn2 = CFrame.new(-113, 144, 39)
-	            local Spawn3 = CFrame.new(-100, 144, 9)
-	            local Spawn4 = CFrame.new(-88, 144, 34)
-	            local Spawn5 = CFrame.new(-86, 144, 38)
-	            local Spawn6 = CFrame.new(-100, 144, 66)
-	            local rnumber = math.random(1,6)
-	            if game.Players.LocalPlayer.Backpack:FindFirstChild("Knife") then
-	                -- game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer("Knife Detected in inventory, Killing all players.", "normalchat")
-	                    game.Players.LocalPlayer.Backpack:FindFirstChild("Knife").Parent = game.Players.LocalPlayer.Character
-	                    repeat wait() until game.Players.LocalPlayer.Character:FindFirstChild("Knife")
-	                    game:GetService("Players").LocalPlayer.Character.Knife.Stab:FireServer("Slash")
-	                    for i,v in pairs(game:GetService("Players"):GetPlayers())do
-	                        if game.Players[v].Character ~= nil then
-	                            if game.Players[v].Character:FindFirstChildOfClass('Humanoid') then
-	                                game.Players[v].Character:FindFirstChildOfClass('Humanoid').Sit = false
-	                            end
-	                            wait()
-	                            getRoot(Players[v].Character).CFrame = getRoot(speaker.Character).CFrame + Vector3.new(3,1,0)
-	                        end
-	                    end
-	            elseif game.Players.LocalPlayer.Backpack:FindFirstChild("Gun") then
-	                if #game:GetService("Players"):GetPlayers() > 0 then
-	                    local randomPlayer = game:GetService("Players"):GetPlayers()[math.random(1, #game:GetService("Players"):GetPlayers())]
-	
-	                    game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer("Gun Detected in inventory, Resetting infront of " .. randomPlayer.Name" ", "normalchat")
-	                    wait(1)
-	                    game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = randomPlayer.Character.HumanoidRootPart.CFrame + Vector3.new(3,1,0)
-	                end
-	                wait(0.5)
-	                game.Players.LocalPlayer.Character.Humanoid.Health = 0
-	                game.Players.LocalPlayer.CharacterAdded:Wait()
-	            else
-	                if not game.Players.LocalPlayer.Backpack:FindFirstChild("Gun") or game.Players.LocalPlayer.Backpack:FindFirstChild("Knife") and game.Players.LocalPlayer.Character:WaitForChild("Humanoid") then
-	                    pcall(function()
-	                        for i, v in pairs(workspace:GetChildren()) do        
-	                            local vChildren = v:GetChildren()
-	                            for i,child in pairs(vChildren) do
-	                                if child.Name == "CoinContainer" then
-	                                        tp(child.Coin_Server.Coin.CFrame, 3)
-	                                else
-	                                    -- game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer("Waiting for coins | Coins not found.", "normalchat")
-	                                    if rnumber == 1 then
-	                                        game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = Spawn1
-	                                    elseif rnumber == 2 then
-	                                        game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = Spawn2
-	                                    elseif rnumber == 3 then
-	                                        game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = Spawn3
-	                                    elseif rnumber == 4 then
-	                                        game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = Spawn4
-	                                    elseif rnumber == 5 then
-	                                        game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = Spawn5
-	                                    else
-	                                        game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = Spawn6
-	                                    end
-	                                end
-	                            end
-	                        end
-	                    end)
-	                end
-	                wait(3.7)
-	            end
-	        end)
-	     until coinfarm == false
-	end
+            pcall(function()
+                local currentX = game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame.X
+                local currentY = game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame.Y
+                local currentZ = game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame.Z
+                local Spawn1 = CFrame.new(-109, 144, 48)
+                local Spawn2 = CFrame.new(-113, 144, 39)
+                local Spawn3 = CFrame.new(-100, 144, 9)
+                local Spawn4 = CFrame.new(-88, 144, 34)
+                local Spawn5 = CFrame.new(-86, 144, 38)
+                local Spawn6 = CFrame.new(-100, 144, 66)
+                local rnumber = math.random(1,6)
+                if game.Players.LocalPlayer.Backpack:FindFirstChild("Knife") then
+                    repeat wait()
+                        game.Players.LocalPlayer.Backpack:FindFirstChild("Knife").Parent = game.Players.LocalPlayer.Character
+                        repeat wait() until game.Players.LocalPlayer.Character:FindFirstChild("Knife")
+                        game:GetService("Players").LocalPlayer.Character.Knife.Stab:FireServer("Slash")
+                        for i,v in pairs(game:GetService("Players"):GetPlayers())do
+                            if game.Players[v].Character ~= nil then
+                                if game.Players[v].Character:FindFirstChildOfClass('Humanoid') then
+                                    game.Players[v].Character:FindFirstChildOfClass('Humanoid').Sit = false
+                                end
+                                wait()
+                                getRoot(Players[v].Character).CFrame = getRoot(speaker.Character).CFrame + Vector3.new(3,1,0)
+                            end
+                        end
+                    until not game.Players.LocalPlayer.Backpack:FindFirstChild("Knife")
+                elseif game.Players.LocalPlayer.Backpack:FindFirstChild("Gun") then
+                    if #game:GetService("Players"):GetPlayers() > 0 then
+                        local randomPlayer = game:GetService("Players"):GetPlayers()[math.random(1, #game:GetService("Players"):GetPlayers())]
+                        
+                        game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = randomPlayer.Character.HumanoidRootPart.CFrame + Vector3.new(3,1,0)
+                        print("Selected Player: " .. randomPlayer.Name)
+                    end
+                    wait(0.5)
+                    game.Players.LocalPlayer.Character.Humanoid.Health = 0
+                    game.Players.LocalPlayer.CharacterAdded:Wait()
+                else
+                    if not game.Players.LocalPlayer.Backpack:FindFirstChild("Gun") or game.Players.LocalPlayer.Backpack:FindFirstChild("Knife") and game.Players.LocalPlayer.Character:WaitForChild("Humanoid") then
+                        pcall(function()
+                            for i, v in pairs(workspace:GetChildren()) do        
+                                local vChildren = v:GetChildren()
+                                for i,child in pairs(vChildren) do
+                                    if child.Name == "CoinContainer" then
+                                        if child.Coin_Server:WaitForChild("Coin") ~= nil then
+                                            tp(child.Coin_Server.Coin.CFrame, 3)
+                                        end
+                                    else
+                                        if rnumber == 1 then
+                                            game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = Spawn1
+                                        elseif rnumber == 2 then
+                                            game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = Spawn2
+                                        elseif rnumber == 3 then
+                                            game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = Spawn3
+                                        elseif rnumber == 4 then
+                                            game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = Spawn4
+                                        elseif rnumber == 5 then
+                                            game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = Spawn5
+                                        else
+                                            game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = Spawn6
+                                        end
+                                    end
+                                end
+                            end
+                        end)
+                    end
+                    wait(3.7)
+                end
+            end)
+         until coinfarm == false
+    end
 end)
 
 AddCommand("uncoinfarm", {"uncf"}, "farms for coins in murder mystery", {3}, function()
