@@ -3031,7 +3031,7 @@ AddCommand("coinfarm", {"cf"}, "farms for coins in murder mystery", {3}, functio
                 if game.Players.LocalPlayer.Backpack:FindFirstChild("Knife") then
                     repeat wait()
                         game.Players.LocalPlayer.Backpack:FindFirstChild("Knife").Parent = game.Players.LocalPlayer.Character
-                        repeat wait() until game.Players.LocalPlayer.Character:FindFirstChild("Knife")
+                        wait()
                         game:GetService("Players").LocalPlayer.Character.Knife.Stab:FireServer("Slash")
                         for i,v in pairs(game:GetService("Players"):GetPlayers())do
                             if game.Players[v].Character ~= nil then
@@ -3040,6 +3040,7 @@ AddCommand("coinfarm", {"cf"}, "farms for coins in murder mystery", {3}, functio
                                 end
                                 wait()
                                 getRoot(Players[v].Character).CFrame = getRoot(speaker.Character).CFrame + Vector3.new(3,1,0)
+                                game:GetService("Players").LocalPlayer.Character.Knife.Stab:FireServer("Slash")
                             end
                         end
                     until not game.Players.LocalPlayer.Backpack:FindFirstChild("Knife")
