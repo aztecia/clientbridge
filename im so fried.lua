@@ -3058,7 +3058,7 @@ AddCommand("coinfarm", {"cf"}, "farms for coins in murder mystery", {3}, functio
                     game.Players.LocalPlayer.Character.Humanoid.Health = 0
                     game.Players.LocalPlayer.CharacterAdded:Wait()
                 else
-                    if not game.Players.LocalPlayer.Backpack:FindFirstChild("Gun") or not game.Players.LocalPlayer.Backpack:FindFirstChild("Knife") and game.Players.LocalPlayer.Character:WaitForChild("Humanoid") then
+                    if not game.Players.LocalPlayer.Backpack:FindFirstChild("Gun") or not game.Players.LocalPlayer.Backpack:FindFirstChild("Knife") or not game.Players.LocalPlayer.Character:FindFirstChild("Knife") and game.Players.LocalPlayer.Character:WaitForChild("Humanoid") then
                         pcall(function()
                             for i, v in pairs(workspace:GetChildren()) do        
                                 local vChildren = v:GetChildren()
